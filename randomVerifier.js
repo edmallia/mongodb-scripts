@@ -157,18 +157,23 @@ randomVerifier = function (loggingDbName,
                       .find({runId: runId, skipped: true}, {_id:0, ns:1})
                       .toArray().map(function(x){return x.ns;});
   print(JSON.stringify(results,null,'\t'));
+  
+  print("*** Mismatches ...")
+  results = loggingDb.getCollection(logCollName).find({runId: runId, matched: false}).toArray();
+  print(JSON.stringify(results,null,'\t'))
+
+
   print("*** To show details of all the processed collections, run the following on the source database ...");
   print("   use " + loggingDbName);
   print("   db." + logCollName + ".find({runId: " + runId.toString() + ", skipped: false}).pretty()");
-  print("*** Mismatches ...")
-  results = loggingDb.getCollection(logCollName).find({runId: runId, matched: false}).toArray();
+  
   if (results && results.length > 0){
     print("*** To view the _id of all the mismatched collections, run the following on the source database ...");
     print("   use " + loggingDbName);
     print("   db." + logCollName + ".find({runId: " + runId.toString() + ", matched: false}).pretty()");
     print("*** ")
   }
-  print(JSON.stringify(results,null,'\t'))
+  
 
 }
 
