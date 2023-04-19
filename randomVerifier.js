@@ -66,7 +66,7 @@ randomVerifier = function (loggingDbName,
     sourceDB = db.getSiblingDB(d.name);
     destDB = destLoggingDB.getSiblingDB(d.name);
 
-    if (d.name !== 'admin' && d.name != 'local') {
+    if (d.name !== 'admin' && d.name != 'local' && d.name != 'config') {
       sourceDB.getCollectionInfos().forEach(function(c) {
         collStartDate = ISODate();
         ns = d.name + "." + c.name;
