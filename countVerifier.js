@@ -92,10 +92,8 @@ countVerifier = function (loggingDbName,
           destColl = destDB.getSiblingDB(d.name).getCollection(c.name);
           
           //load counts to work with
-          //sourceCollCount = sourceColl.countDocuments({}, { hint: "_id_" });
-          //destCollCount = destColl.countDocuments({}, { hint: "_id_" });
           sourceCollCount = sourceColl.count();
-          destCollCount = destColl.countDocuments({}, { hint: "_id_" });
+          destCollCount = destColl.count();
           if (sourceCollCount === destCollCount){
             runSummary.coll.matches++;
           }
