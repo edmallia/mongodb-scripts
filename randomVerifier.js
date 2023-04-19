@@ -1,15 +1,29 @@
 randomVerifier = function (loggingDbName,
                           destUsername,
-                          destConnString, 
+                          destPassword,
+                          destConnString,
                           sampleSize, 
-                          partitions,
+                          partitions, 
                           databaseWhitelist){
 
   //initialise databaseWhitelist
-  print("*** Database whitelist: " + JSON.stringify(databaseWhitelist));
   if (databaseWhitelist && !Array.isArray(databaseWhitelist)){
-    print("databaseWhitelist should be an array");
+    print("*** Database whitelist: " + JSON.stringify(databaseWhitelist));
+    print("databaseWhitelist should be an array or null if no white list is required");
     return;
+  }
+  else if (databaseWhitelist && Array.isArray(databaseWhitelist)){
+    if (databaseWhitelist.length === 0){
+      print("*** Database whitelist: " + JSON.stringify(databaseWhitelist));
+      print("databaseWhitelist is empty array, but should contain at least one database to verify. If all databases should be verified, pass null for databaseWhitelist.");
+      return;
+    }
+    else {
+      print("*** Database whitelist: " + JSON.stringify(databaseWhitelist));
+    }
+  }
+  else {
+    print("*** No database whitelist provided. Proceeding with all databases.");
   }
 
   loggingDb = db.getSiblingDB(loggingDbName);
@@ -18,22 +32,40 @@ randomVerifier = function (loggingDbName,
   logCollName = "log";
 
   runId = ObjectId();
-  print("*** Starting new run with id " + runId);
-  loggingDb.getCollection(jobCollName).insert({_id: runId, start: ISODate()});
+  print("*** Starting new run with id " + runId.toString());
+  loggingDb.getCollection(jobCollName).insert({_id: runId, verificationType: "random", start: ISODate()});
   runSummary = {
-    skipped: 0,
-    processed: 0,
-    hashMatches : 0,
-    hashMismatches : 0
+    db : {
+      processed : [],
+      skipped: []
+    },
+    coll : {
+      processed : 0,
+      skipped : 0,
+      matches: 0,
+      mismatches: 0 
+    }
   }
   
   destMongo = new Mongo(destConnString).getDB("admin")
-  destMongo.auth(destUsername, passwordPrompt())
+  if (!destPassword){
+    print("Executing passwordPrompt() function to obtain destination password")
+    pwd = passwordPrompt();
+  }
+  else if (destPassword && typeof destPassword === 'function'){
+    print("Executing supplied password function to obtain destination password")
+    pwd = destPassword();
+  }
+  else{
+    pwd = destPassword;
+  }
+  destMongo.auth(destUsername, pwd);
   destLoggingDB = destMongo.getSiblingDB(loggingDbName);
 
   db.adminCommand("listDatabases").databases.forEach(function(d) {
     sourceDB = db.getSiblingDB(d.name);
-    
+    destDB = destLoggingDB.getSiblingDB(d.name);
+
     if (d.name !== 'admin' && d.name != 'local') {
       sourceDB.getCollectionInfos().forEach(function(c) {
         collStartDate = ISODate();
@@ -41,19 +73,24 @@ randomVerifier = function (loggingDbName,
 
         if (d.name === loggingDbName){
           print("Skipping loggingDb collection: " + ns);
+          addUniqueValueToArray(d.name, runSummary.db.skipped);
           recordSkippedCollection(loggingDb, logCollName, runSummary, ns, runId, collStartDate);
         }
         else if (c.name.startsWith('system.')){
           print("Skipping system collection: " + ns);
+          addUniqueValueToArray(d.name, runSummary.db.skipped);
           recordSkippedCollection(loggingDb, logCollName, runSummary, ns, runId, collStartDate);
         }
         else if (databaseWhitelist && Array.isArray(databaseWhitelist) && databaseWhitelist.indexOf(d.name) < 0){
           print("Skipping collection as not part of database whitelist: " + ns);
+          addUniqueValueToArray(d.name, runSummary.db.skipped);
           recordSkippedCollection(loggingDb, logCollName, runSummary, ns, runId, collStartDate);
         }
         else {
           print("Processing collection: " + ns);
-          runSummary.processed++;
+          addUniqueValueToArray(d.name, runSummary.db.processed);
+          runSummary.coll.processed++;
+
 
           //collection init
           outCollName = outCollPrefix + "." + d.name + "." + c.name;
@@ -61,7 +98,7 @@ randomVerifier = function (loggingDbName,
           destLoggingDB.getCollection(outCollName).drop();
 
           sourceColl = sourceDB.getSiblingDB(d.name).getCollection(c.name);
-          
+
           //load ids to work with
           loadedIds = loadIds(sourceColl, sampleSize, partitions);
 
@@ -74,26 +111,28 @@ randomVerifier = function (loggingDbName,
           extractSampleDocs(destDB, c.name, loadedIds, loggingDbName, outCollName);
           destMd5 = computeHashForCollection(destLoggingDB, outCollName);
 
-          if (srcMd5 === destMd5){
-            runSummary.hashMatches++;
+          matched = (srcMd5 === destMd5)
+          if (matched){
+            runSummary.coll.matches++;
           }
           else{
-            runSummary.hashMismatches++;
+            runSummary.coll.mismatches++;
           }
 
           resultDoc = {
             runId : runId,
             ns : ns,
             skipped: false,
+            verificationType: "random",
             start : collStartDate,
-            end : ISODate(),
             noDocs: loadedIds.length,
-            src : srcMd5, 
-            dst : destMd5,
-            matched : (srcMd5 === destMd5)
+            srcMd5 : srcMd5, 
+            dstMd5 : destMd5,
+            matched : matched
           }
 
-          if (srcMd5 !== destMd5){
+          //add additional logs in case of errors and maintain temp collections
+          if (!matched){
             resultDoc.ids = loadedIds;
           }
           else{
@@ -120,25 +159,32 @@ randomVerifier = function (loggingDbName,
   print(JSON.stringify(results,null,'\t'));
   print("*** To show details of all the processed collections, run the following on the source database ...");
   print("   use " + loggingDbName);
-  print("   db." + logCollName + ".find({runId: ObjectId('" + runId + "'), skipped: false}).pretty()");
+  print("   db." + logCollName + ".find({runId: " + runId.toString() + ", skipped: false}).pretty()");
   print("*** Mismatches ...")
-  results = loggingDb.getCollection(logCollName).find({runId: runId, matched: false}, {ids:0}).toArray();
+  results = loggingDb.getCollection(logCollName).find({runId: runId, matched: false}).toArray();
   if (results && results.length > 0){
     print("*** To view the _id of all the mismatched collections, run the following on the source database ...");
     print("   use " + loggingDbName);
-    print("   db." + logCollName + ".find({runId: ObjectId('" + runId + "'), matched: false}).pretty()");
+    print("   db." + logCollName + ".find({runId: " + runId.toString() + ", matched: false}).pretty()");
     print("*** ")
   }
   print(JSON.stringify(results,null,'\t'))
 
 }
 
+addUniqueValueToArray = function (value, array){
+  if (array.indexOf(value) < 0){
+    array.push(value);
+  }
+}
+
 recordSkippedCollection = function(loggingDb, logCollName, runSummary, ns, runId, collStartDate){
-  runSummary.skipped++;
+  runSummary.coll.skipped++;
   resultDoc = {
             runId : runId,
             ns : ns,
             skipped: true,
+            verificationType: "random",
             start : collStartDate,
             end : collStartDate,
           }
@@ -238,8 +284,9 @@ var reduceFunction = function(key,values){
 randomVerifier(
   "logging", //loggingDbName
   "admin", //destUsername
-  "", //destConnString
+  "", //destPassword - can be <string>, <function reference> e.g. passwordPrompt, null will execute passwordPrompt()
+  "", //destination connection string (ignores credentials)
   200, //sampleSize 
   1, //partitions
-  ["foo"] //databaseWhitelist (optional)
+  [""] //databaseWhitelist (optional) - provide null or do not supply parameter to process all dbs
 );
