@@ -43,7 +43,7 @@ metaDataVerifier = function (loggingDbName,
       mismatches: 0 
     }
   }
-  
+
   destMongo = new Mongo(destConnString).getDB("admin")
   if (!destPassword){
     print("Executing passwordPrompt() function to obtain destination password")
@@ -75,7 +75,6 @@ metaDataVerifier = function (loggingDbName,
         }
         else if (c.name.startsWith('system.')){
           print("Skipping system collection: " + ns);
-          addUniqueValueToArray(d.name, runSummary.db.skipped);
           recordSkippedCollection(loggingDb, logCollName, runSummary, ns, runId, collStartDate);
         }
         else if (databaseWhitelist && Array.isArray(databaseWhitelist) && databaseWhitelist.indexOf(d.name) < 0){
@@ -88,24 +87,51 @@ metaDataVerifier = function (loggingDbName,
           addUniqueValueToArray(d.name, runSummary.db.processed);
           runSummary.coll.processed++;
   
-          srcInfo = sourceDB.getSiblingDB(d.name).getCollectionInfos({name: c.name})[0]
-          srcIdx = sourceDB.getSiblingDB(d.name).getCollection(c.name).getIndexes()
-          delete srcInfo.info.uuid;
-          srcInfo.idx = srcIdx;
+          srcInfo = {}
 
-          dstInfo = destDB.getSiblingDB(d.name).getCollectionInfos({name: c.name})
-          if (dstInfo.length === 0){
-            dstInfo = {};
+          srcCollectionInfo = sourceDB.getSiblingDB(d.name).getCollectionInfos({name: c.name})[0]
+          srcInfo.options = srcCollectionInfo.options;
+
+          srcIdx = sourceDB.getSiblingDB(d.name).getCollection(c.name).getIndexes()
+          if (srcIdx && Array.isArray(srcIdx)){
+            for (i = 0; i < srcIdx.length; i++){
+              if (srcIdx[i].ns) {
+                delete srcIdx[i].ns
+              }
+              if (srcIdx[i].v) {
+                delete srcIdx[i].v
+              }
+            }
           }
-          else{
-            dstInfo = dstInfo[0];
+          srcInfo.idx = srcIdx;
+          
+
+          dstInfo = {};
+          dstCollectionInfo = destDB.getSiblingDB(d.name).getCollectionInfos({name: c.name})
+          if (dstCollectionInfo.length > 0){
+            dstInfo.options = dstCollectionInfo[0].options;
 
             dstIdx = destDB.getSiblingDB(d.name).getCollection(c.name).getIndexes()
-            delete dstInfo.info.uuid;
+
+            if (dstIdx && Array.isArray(dstIdx)){
+             for (i = 0; i < dstIdx.length; i++){
+                print(i)
+                if (dstIdx[i].ns) {
+                  delete dstIdx[i].ns
+                }
+                if (dstIdx[i].v) {
+                  delete dstIdx[i].v
+                }
+              }
+            }
             dstInfo.idx = dstIdx;
           }
 
+          srcInfo = sortX(srcInfo);
+          dstInfo = sortX(dstInfo);
+          
           matched = JSON.stringify(srcInfo) === JSON.stringify(dstInfo);
+          
           if (matched){
             runSummary.coll.matches++;
           }
@@ -142,20 +168,45 @@ metaDataVerifier = function (loggingDbName,
                       .find({runId: runId, skipped: true}, {_id:0, ns:1})
                       .toArray().map(function(x){return x.ns;});
   print(JSON.stringify(results,null,'\t'));
+  
+  print("*** Mismatches ...")
+  results = loggingDb.getCollection(logCollName).find({runId: runId, matched: false}).toArray();
+  print(JSON.stringify(results,null,'\t'))
+
   print("*** To show details of all the processed collections, run the following on the source database ...");
   print("   use " + loggingDbName);
   print("   db." + logCollName + ".find({runId: " + runId.toString() + ", skipped: false}).pretty()");
-  print("*** Mismatches ...")
-  results = loggingDb.getCollection(logCollName).find({runId: runId, matched: false}).toArray();
+  
   if (results && results.length > 0){
     print("*** To view the _id of all the mismatched collections, run the following on the source database ...");
     print("   use " + loggingDbName);
     print("   db." + logCollName + ".find({runId: " + runId.toString() + ", matched: false}).pretty()");
+    print("   Note, you can further filter using the namespace ns e.g. ...");
+    print("   use " + loggingDbName);
+    print("   db." + logCollName + ".find({runId: " + runId.toString() + ", matched: false, ns: <namespace>}).pretty()");
     print("*** ")
   }
-  print(JSON.stringify(results,null,'\t'))
 
 }
+
+var isObject = function(v) {
+      return '[object Object]' === Object.prototype.toString.call(v)
+          || '[object BSON]' === Object.prototype.toString.call(v);
+  };
+
+var sortX = function(o) {
+    if (Array.isArray(o)) {
+        return o.map(sortX);
+    } else if (isObject(o)) {
+        return Object.keys(o)
+            .sort()
+            .reduce(function(a, k) {
+                a[k] = sortX(o[k]);
+                return a;
+            }, {});
+    }
+    return o;
+  };
 
 addUniqueValueToArray = function (value, array){
   if (array.indexOf(value) < 0){
