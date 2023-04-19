@@ -75,7 +75,6 @@ countVerifier = function (loggingDbName,
         }
         else if (c.name.startsWith('system.')){
           print("Skipping system collection: " + ns);
-          addUniqueValueToArray(d.name, runSummary.db.skipped);
           recordSkippedCollection(loggingDb, logCollName, runSummary, ns, runId, collStartDate);
         }
         else if (databaseWhitelist && Array.isArray(databaseWhitelist) && databaseWhitelist.indexOf(d.name) < 0){
