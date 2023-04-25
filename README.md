@@ -1,8 +1,10 @@
 # mongodb-scripts
 Collection of mongodb scripts
 
+## Migration Verification Scripts
+These scripts require at least Mongo Shell 3.6. The scripts will not work on Mongo Shell of a lower version. They have been tried against source MongoDB Server versions 3.0, 3.2, 3.4, 3.6.
 
-## randomVerifier.js
+### randomVerifier.js
 The steps performed in the verification script are outlined below
 1. For each collection in the whitelisted databases (note, supply null as whitelist to process all databases)
    1. Select a random set of _id from the given collection. The selection is run on the source collection and runs against the _id index. The selection is configured by supplying,
@@ -17,14 +19,14 @@ The steps performed in the verification script are outlined below
    1. Generate the dbHash for the output collections.
    1. Compare dbHash’es and report.
 
-## countVerifier.js
+### countVerifier.js
 The steps performed in the verification script are outlined below
 1. For each collection in the whitelisted databases (note, supply null as whitelist to process all databases)
    1. Count the number of documents in the given collection on the source database.
    1. Count the number of documents in the given collection on the destination database.
    1. Compare counts and report.
 
-## metadataVerifier.js
+### metadataVerifier.js
 The steps performed in the verification script are outlined below
 1. For each collection in the whitelisted databases (note, supply null as whitelist to process all databases)
    1. Extract the getCollectionInfos(..) and getIndexes() output for the given collection on the source database.
