@@ -101,6 +101,9 @@ metaDataVerifier = function (loggingDbName,
               if (srcIdx[i].v) {
                 delete srcIdx[i].v
               }
+              if (srcIdx[i].background) {
+                delete srcIdx[i].background
+              }
             }
           }
           srcIdx.sort(function(a,b) { let x = a.name.toLowerCase(); let y = b.name.toLowerCase();  if(x>y){return 1;} if(x<y){return -1;} return 0;})
@@ -122,6 +125,9 @@ metaDataVerifier = function (loggingDbName,
                 }
                 if (dstIdx[i].v) {
                   delete dstIdx[i].v
+                }
+                if (dstIdx[i].background) {
+                  delete dstIdx[i].background
                 }
               }
             }
