@@ -91,6 +91,9 @@ metaDataVerifier = function (loggingDbName,
 
           srcCollectionInfo = sourceDB.getSiblingDB(d.name).getCollectionInfos({name: c.name})[0]
           srcInfo.options = srcCollectionInfo.options;
+          if (srcInfo.options && srcInfo.options.flags){
+            delete srcInfo.options.flags;
+          }
 
           srcIdx = sourceDB.getSiblingDB(d.name).getCollection(c.name).getIndexes()
           if (srcIdx && Array.isArray(srcIdx)){
@@ -114,6 +117,9 @@ metaDataVerifier = function (loggingDbName,
           dstCollectionInfo = destDB.getSiblingDB(d.name).getCollectionInfos({name: c.name})
           if (dstCollectionInfo.length > 0){
             dstInfo.options = dstCollectionInfo[0].options;
+            if (dstInfo.options && dstInfo.options.flags){
+              delete dstInfo.options.flags;
+            }
 
             dstIdx = destDB.getSiblingDB(d.name).getCollection(c.name).getIndexes()
 
