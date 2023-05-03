@@ -164,7 +164,7 @@ recordSkippedCollection = function(loggingDb, logCollName, runSummary, ns, runId
 }
 
 countVerifier(
-  "logging", //loggingDbName
+  "local", //loggingDbName
   "admin", //destUsername
   null, //destPassword - can be <string>, <function reference> e.g. passwordPrompt, null will execute passwordPrompt()
   "", //destination connection string (ignores credentials)
