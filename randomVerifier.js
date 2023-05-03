@@ -286,7 +286,7 @@ var reduceFunction = function(key,values){
 };
 
 randomVerifier(
-  "logging", //loggingDbName
+  "local", //loggingDbName
   "admin", //destUsername
   "", //destPassword - can be <string>, <function reference> e.g. passwordPrompt, null will execute passwordPrompt()
   "", //destination connection string (ignores credentials)
