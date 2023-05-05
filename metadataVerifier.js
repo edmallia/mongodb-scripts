@@ -104,7 +104,7 @@ metaDataVerifier = function (loggingDbName,
               if (srcIdx[i].v) {
                 delete srcIdx[i].v
               }
-              if (srcIdx[i].background) {
+              if (typeof srcIdx[i].background !== 'undefined'){
                 delete srcIdx[i].background
               }
             }
@@ -132,7 +132,7 @@ metaDataVerifier = function (loggingDbName,
                 if (dstIdx[i].v) {
                   delete dstIdx[i].v
                 }
-                if (dstIdx[i].background) {
+                if (typeof dstIdx[i].background !== 'undefined'){
                   delete dstIdx[i].background
                 }
               }
